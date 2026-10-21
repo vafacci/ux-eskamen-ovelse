@@ -1,29 +1,47 @@
-import { useMemo, useState } from 'react'
-import { quizQuestions } from '../data/quiz'
+import { useEffect, useState } from 'react'
+import { quizQuestions, type QuizQuestion } from '../data/quiz'
 import type { ProgressApi } from '../hooks/useProgress'
 
+function sortQuestions(
+  questions: QuizQuestion[],
+  correctIds: string[],
+  wrongIds: string[],
+) {
+  return [...questions].sort((a, b) => {
+    const aWrong = wrongIds.includes(a.id) ? 0 : 1
+    const bWrong = wrongIds.includes(b.id) ? 0 : 1
+    const aOk = correctIds.includes(a.id) ? 1 : 0
+    const bOk = correctIds.includes(b.id) ? 1 : 0
+    return aWrong - bWrong || aOk - bOk
+  })
+}
+
 export function Quiz({ progressApi }: { progressApi: ProgressApi }) {
-  const { progress, markQuiz } = progressApi
+  const { progress, ready, markQuiz } = progressApi
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
+  const [round, setRound] = useState<QuizQuestion[]>(() => [...quizQuestions])
+  const [hydrated, setHydrated] = useState(false)
 
-  const order = useMemo(() => {
-    return [...quizQuestions].sort((a, b) => {
-      const aWrong = progress.quizWrong.includes(a.id) ? 0 : 1
-      const bWrong = progress.quizWrong.includes(b.id) ? 0 : 1
-      const aOk = progress.quizCorrect.includes(a.id) ? 1 : 0
-      const bOk = progress.quizCorrect.includes(b.id) ? 1 : 0
-      return aWrong - bWrong || aOk - bOk
-    })
-  }, [progress.quizCorrect, progress.quizWrong])
+  useEffect(() => {
+    if (!ready || hydrated || selected !== null) return
+    setRound(sortQuestions(quizQuestions, progress.quizCorrect, progress.quizWrong))
+    setHydrated(true)
+  }, [ready, hydrated, selected, progress.quizCorrect, progress.quizWrong])
 
-  const q = order[index % order.length]
+  const q = round[index % round.length]
   const answered = selected !== null
   const correct = selected === q.correctIndex
 
   const next = () => {
+    const nextIndex = (index + 1) % round.length
+    if (nextIndex === 0) {
+      setRound(
+        sortQuestions(quizQuestions, progress.quizCorrect, progress.quizWrong),
+      )
+    }
+    setIndex(nextIndex)
     setSelected(null)
-    setIndex((i) => (i + 1) % order.length)
   }
 
   return (
@@ -38,7 +56,7 @@ export function Quiz({ progressApi }: { progressApi: ProgressApi }) {
 
       <div className="rounded-3xl border border-black/8 bg-white p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-          Spørgsmål {(index % order.length) + 1} / {order.length}
+          Spørgsmål {(index % round.length) + 1} / {round.length}
         </p>
         <h3 className="mt-3 font-display text-xl font-semibold leading-snug">
           {q.question}
