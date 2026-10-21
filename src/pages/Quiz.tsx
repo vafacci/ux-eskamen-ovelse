@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { quizQuestions, type QuizQuestion } from '../data/quiz'
 import type { ProgressApi } from '../hooks/useProgress'
 
@@ -18,29 +18,51 @@ function sortQuestions(
 
 export function Quiz({ progressApi }: { progressApi: ProgressApi }) {
   const { progress, ready, markQuiz } = progressApi
+  const [queue, setQueue] = useState<QuizQuestion[]>(() => [...quizQuestions])
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
-  const [round, setRound] = useState<QuizQuestion[]>(() => [...quizQuestions])
-  const [hydrated, setHydrated] = useState(false)
+  // Snapshot of the question on screen — never changes while feedback is shown
+  const [card, setCard] = useState<QuizQuestion>(() => quizQuestions[0])
+  const booted = useRef(false)
 
   useEffect(() => {
-    if (!ready || hydrated || selected !== null) return
-    setRound(sortQuestions(quizQuestions, progress.quizCorrect, progress.quizWrong))
-    setHydrated(true)
-  }, [ready, hydrated, selected, progress.quizCorrect, progress.quizWrong])
+    if (!ready || booted.current) return
+    booted.current = true
+    const sorted = sortQuestions(
+      quizQuestions,
+      progress.quizCorrect,
+      progress.quizWrong,
+    )
+    setQueue(sorted)
+    setIndex(0)
+    setCard(sorted[0])
+    setSelected(null)
+  }, [ready, progress.quizCorrect, progress.quizWrong])
 
-  const q = round[index % round.length]
   const answered = selected !== null
-  const correct = selected === q.correctIndex
+  const correct = selected === card.correctIndex
+
+  const answer = (optionIndex: number) => {
+    if (selected !== null) return
+    setSelected(optionIndex)
+    markQuiz(card.id, optionIndex === card.correctIndex)
+  }
 
   const next = () => {
-    const nextIndex = (index + 1) % round.length
-    if (nextIndex === 0) {
-      setRound(
-        sortQuestions(quizQuestions, progress.quizCorrect, progress.quizWrong),
+    const nextIndex = index + 1
+    if (nextIndex >= queue.length) {
+      const sorted = sortQuestions(
+        quizQuestions,
+        progress.quizCorrect,
+        progress.quizWrong,
       )
+      setQueue(sorted)
+      setIndex(0)
+      setCard(sorted[0])
+    } else {
+      setIndex(nextIndex)
+      setCard(queue[nextIndex])
     }
-    setIndex(nextIndex)
     setSelected(null)
   }
 
@@ -54,20 +76,23 @@ export function Quiz({ progressApi }: { progressApi: ProgressApi }) {
         </p>
       </div>
 
-      <div className="rounded-3xl border border-black/8 bg-white p-6 shadow-sm">
+      <div
+        key={card.id}
+        className="rounded-3xl border border-black/8 bg-white p-6 shadow-sm"
+      >
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-          Spørgsmål {(index % round.length) + 1} / {round.length}
+          Spørgsmål {index + 1} / {queue.length}
         </p>
         <h3 className="mt-3 font-display text-xl font-semibold leading-snug">
-          {q.question}
+          {card.question}
         </h3>
 
         <div className="mt-5 space-y-2">
-          {q.options.map((opt, i) => {
+          {card.options.map((opt, i) => {
             let style =
               'border-black/10 bg-white hover:border-ww-green/50 hover:bg-ww-green-soft'
             if (answered) {
-              if (i === q.correctIndex)
+              if (i === card.correctIndex)
                 style = 'border-ww-green bg-ww-green-soft text-ink'
               else if (i === selected)
                 style = 'border-red-300 bg-red-50 text-red-900'
@@ -75,13 +100,10 @@ export function Quiz({ progressApi }: { progressApi: ProgressApi }) {
             }
             return (
               <button
-                key={opt}
+                key={`${card.id}-${i}`}
                 type="button"
                 disabled={answered}
-                onClick={() => {
-                  setSelected(i)
-                  markQuiz(q.id, i === q.correctIndex)
-                }}
+                onClick={() => answer(i)}
                 className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${style}`}
               >
                 {opt}
@@ -95,10 +117,10 @@ export function Quiz({ progressApi }: { progressApi: ProgressApi }) {
             <p className="font-semibold">
               {correct ? 'Korrekt' : 'Ikke helt'}
             </p>
-            <p>{q.explanation}</p>
+            <p>{card.explanation}</p>
             <p className="text-ink-muted">
               <span className="font-medium text-ink">Eksempel: </span>
-              {q.example}
+              {card.example}
             </p>
           </div>
         )}
