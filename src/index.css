@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ww-green: #00e676;
+  --color-ww-green-dark: #00c853;
+  --color-ww-green-soft: #e8fff0;
+  --color-ink: #0a0a0a;
+  --color-ink-muted: #5c5c5c;
+  --color-surface: #f7f7f5;
+  --color-card: #ffffff;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply m-0 min-h-dvh bg-surface font-body text-ink antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 100% -20%, rgba(0, 230, 118, 0.12), transparent),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(0, 230, 118, 0.06), transparent);
+  }
+
+  #root {
+    @apply min-h-dvh;
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
